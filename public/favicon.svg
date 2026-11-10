@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>PayPilot AI</title>
+  <rect width="64" height="64" rx="17" fill="#087647"/>
+  <path d="M18 10h19l10 10v30a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4V14a4 4 0 0 1 4-4Z" fill="#fff"/>
+  <path d="M37 10v8a2 2 0 0 0 2 2h8" fill="#CDEBDD"/>
+  <path d="M21 27h15M21 33h11" stroke="#087647" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="42" cy="43" r="11" fill="#55C98B"/>
+  <path d="m37.5 43 3 3 6-6.5" fill="none" stroke="#064D2F" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

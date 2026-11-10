@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    match /public_invoices/{invoiceId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.orderId == invoiceId
+        && request.resource.data.status == 'awaiting_approval';
+      allow update: if resource.data.status == 'awaiting_approval'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'transactionId', 'payerEmail', 'capturedAt'])
+        && request.resource.data.status == 'captured_simulation'
+        && request.resource.data.transactionId is string
+        && request.resource.data.payerEmail is string
+        && request.resource.data.capturedAt is string;
+      allow delete: if false;
+    }
+  }
+}

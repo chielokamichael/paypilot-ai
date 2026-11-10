@@ -1,0 +1,15 @@
+/*
+ * PayPilot AI — Global Stylesheet
+ *
+ * Import order matters:
+ *   1. base        — reset + typography (imports tokens.css itself)
+ *   2. layout      — app shell (sidebar, page containers, grids)
+ *   3. components  — shared UI (buttons, forms, tables, modals…)
+ *   4. pages       — page-specific compositions
+ */
+
+@import './base.css';
+@import './layout.css';
+@import './components.css';
+@import './pages.css';
+@import './auth.css';

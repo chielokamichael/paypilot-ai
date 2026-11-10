@@ -1,0 +1,109 @@
+/* src/styles/tokens.css */
+:root {
+  /* Light theme (default) */
+  --color-bg:              #F4F7F5;
+  --color-surface:         #FFFFFF;
+  --color-surface-alt:     #F0F5F1;
+  --color-ink:             #18231D;
+  --color-ink-2:           #59675F;
+  --color-ink-3:           #849188;
+  --color-accent:          #087647;
+  --color-accent-hover:    #06643B;
+  --color-accent-active:   #044D2E;
+  --color-accent-light:    #E6F4EC;
+  --color-accent-text:     #FFFFFF;
+  --color-success:         #14764B;
+  --color-warning:         #8A5A08;
+  --color-danger:          #B8423A;
+  --color-danger-light:    #FCEDEA;
+  --color-sim:             #42658C;
+  --color-sim-light:       #EAF1F8;
+  --color-draft:           #525252;
+  --color-draft-light:     #F0F2F0;
+  --color-border:          #E0E8E2;
+  --color-border-strong:   #C9D6CD;
+  --color-success-light:   #E7F5EC;
+  --color-warning-light:   #FFF4DC;
+
+  --font-sans:             'Manrope', 'Segoe UI', sans-serif;
+  --font-mono:             'DM Mono', 'SFMono-Regular', monospace;
+
+  --text-xs:               0.75rem;
+  --text-sm:               0.875rem;
+  --text-base:             1rem;
+  --text-md:               1.125rem;
+  --text-xl:               1.5rem;
+  --text-2xl:              2rem;
+  --text-3xl:              2.5rem;
+
+  --weight-regular:        400;
+  --weight-medium:         500;
+  --weight-semi:           600;
+  --weight-bold:           700;
+
+  --leading-tight:         1.2;
+  --leading-snug:          1.375;
+  --leading-normal:        1.5;
+
+  --space-1:               0.25rem;
+  --space-2:               0.5rem;
+  --space-3:               0.75rem;
+  --space-4:               1rem;
+  --space-5:               1.25rem;
+  --space-6:               1.5rem;
+  --space-8:               2rem;
+  --space-10:              2.5rem;
+  --space-12:              3rem;
+  --space-16:              4rem;
+
+  --radius-sm:             0.25rem;
+  --radius-md:             0.375rem;
+  --radius-lg:             0.5rem;
+  --radius-xl:             0.75rem;
+  --radius-pill:           9999px;
+
+  --shadow-md:             0 4px 12px rgba(26, 25, 24, 0.08);
+  --shadow-lg:             0 12px 32px rgba(26, 25, 24, 0.14);
+
+  --sidebar-width:         248px;
+  --content-max:           1280px;
+  --nav-height-mob:        56px;
+
+  --transition-fast:       150ms;
+  --transition-normal:     250ms;
+}
+
+/* Dark theme overrides – applied when <body class="theme-dark"> */
+.theme-dark {
+  --color-bg:              #17211B;
+  --color-surface:         #202B24;
+  --color-surface-alt:     #29352D;
+  --color-ink:             #F0F5F1;
+  --color-ink-2:           #C1CEC4;
+  --color-ink-3:           #94A398;
+  --color-accent:          #55C98B;
+  --color-accent-hover:    #73D79F;
+  --color-accent-active:   #8BE0B0;
+  --color-accent-light:    #294536;
+  --color-success:         #67D49B;
+  --color-warning:         #E6B75C;
+  --color-danger:          #E77C72;
+  --color-danger-light:     #4A2C2B;
+  --color-sim:             #8FB7DC;
+  --color-sim-light:        #2D4052;
+  --color-draft:           #BDBDBD;
+  --color-draft-light:     #424242;
+  --color-border:           #35443A;
+  --color-border-strong:    #4A5D50;
+  --color-success-light:    #294536;
+  --color-warning-light:    #443A27;
+}
+
+/* Reduced‑motion etc stays the same */
+@media (prefers-reduced-motion: reduce) {
+  :root, .theme-dark { /* same vars */
+    --transition-fast:   0ms;
+    --transition-normal: 0ms;
+    --transition-slow:   0ms;
+  }
+}

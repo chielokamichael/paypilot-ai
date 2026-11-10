@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#087647" />
+    <meta
+      name="description"
+      content="PayPilot AI — turn client requests into structured quotations and simulated PayPal payment requests."
+    />
+    <title>PayPilot AI — Quotes &amp; Payments</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar" id="nav-sidebar" aria-label="Sidebar navigation"></aside>
+
+      <div class="main-content">
+        <header class="topnav" id="topnav"></header>
+        <main class="page-container" id="page-content"></main>
+      </div>
+    </div>
+
+    <!-- PayPal JavaScript SDK v6 (Sandbox) -->
+    <script src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
