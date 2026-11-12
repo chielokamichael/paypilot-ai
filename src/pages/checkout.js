@@ -31,16 +31,31 @@ let sdkInstance = null;
 let currentParams = {};
 let unsubscribeInvoice = null;
 let unsubscribeStore = null;
+let invoiceOwnerUid = null;
 
 function isFreelancerPreview() {
-  return Boolean(getState().authUser) && currentParams.client !== '1';
+  return Boolean(getState().authUser) && currentParams.client !== '1' && !currentParams.inv;
+}
+
+function canUpdateAccountState() {
+  const { authUser, payments, quotes } = getState();
+  if (!authUser) return false;
+  if (invoiceOwnerUid) return invoiceOwnerUid === authUser.uid;
+  if (!isFreelancerPreview()) return false;
+
+  const localPayment = payments.find(item => item.id === payment?.id);
+  return localPayment?.quoteId === payment?.quoteId && quotes.some(item => item.id === payment.quoteId);
 }
 
 async function loadPayment(orderId, params = {}) {
+  invoiceOwnerUid = null;
+  const isClientLink = params.client === '1' || Boolean(params.inv);
+
   // The public invoice is authoritative; link payloads and local storage can be stale.
   try {
     const remote = await fetchPublicInvoice(orderId);
     if (remote) {
+      invoiceOwnerUid = remote.ownerUid || null;
       payment = {
         id: orderId,
         quoteId: remote.quoteId || 'INV-001',
@@ -62,20 +77,24 @@ async function loadPayment(orderId, params = {}) {
         assumptions: remote.assumptions || [],
         exclusions: remote.exclusions || [],
       };
-      upsertPayment(payment);
-      upsertQuote(quote);
+      if (canUpdateAccountState()) {
+        upsertPayment(payment);
+        upsertQuote(quote);
+      }
       return true;
     }
   } catch (err) {
     console.warn('Firestore fetchPublicInvoice error:', err);
   }
 
-  // Fall back to the local store if the public invoice is unavailable.
-  const { payments } = getState();
-  payment = payments.find(p => p.id === orderId);
-  if (payment) {
-    quote = getQuoteById(payment.quoteId);
-    if (quote) return true;
+  // Client links must not fall back to another signed-in user's workspace data.
+  if (!isClientLink) {
+    const { payments } = getState();
+    payment = payments.find(p => p.id === orderId);
+    if (payment) {
+      quote = getQuoteById(payment.quoteId);
+      if (quote) return true;
+    }
   }
 
   // URL payload is the final fallback for a fresh browser without Firestore access.
@@ -103,8 +122,6 @@ async function loadPayment(orderId, params = {}) {
         assumptions: decoded.assumptions || [],
         exclusions: decoded.exclusions || [],
       };
-      upsertPayment(payment);
-      upsertQuote(quote);
       return true;
     }
   }
@@ -118,11 +135,11 @@ function render() {
 
   const { amount, currency, status } = payment;
   const { clientName, clientEmail, projectTitle, lineItems, milestones, exclusions, assumptions } = quote || {};
-  const { settings, authUser } = getState();
+  const { settings } = getState();
   const freelancerPreview = isFreelancerPreview();
 
-  const merchantName = settings.businessName || 'Freelance Professional';
-  const payoutEmail = settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai';
+  const merchantName = payment.merchantName || (freelancerPreview ? settings.businessName : '') || 'Freelance Professional';
+  const payoutEmail = payment.payoutEmail || (freelancerPreview ? settings.paypalPayoutEmail || settings.businessEmail : '') || 'merchant@paypilot.ai';
 
   // Render line items summary rows
   const lineRows = (lineItems || []).map(li => `
@@ -478,18 +495,18 @@ async function setupPayPalV6Buttons() {
       return;
     }
 
-    upsertPayment(updatedPayment);
-
-    // Keep the freelancer's quote state consistent with the captured payment.
-    if (quote) {
-      upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+    if (canUpdateAccountState()) {
+      upsertPayment(updatedPayment);
+      if (quote) {
+        upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+      }
     }
 
     if (statusEl) {
       statusEl.textContent = 'Simulated checkout complete. No real payment was processed. Redirecting to receipt...';
     }
     const nextHash = currentParams.inv
-      ? `#route/payment/${payment.id}?autoprint=1&inv=${currentParams.inv}`
+      ? `#route/payment/${payment.id}?client=1&autoprint=1&inv=${currentParams.inv}`
       : `#route/payment/${payment.id}?autoprint=1`;
     setTimeout(() => {
       location.hash = nextHash;
@@ -564,7 +581,7 @@ async function setupPayPalV6Buttons() {
 function bindEvents() {
   // Copy Link for Client (preview banner)
   document.getElementById('btn-copy-preview-link')?.addEventListener('click', async () => {
-    const { settings } = getState();
+    const { settings, authUser } = getState();
     const clientPayload = {
       orderId: payment.id,
       quoteId: payment.quoteId,
@@ -580,6 +597,7 @@ function bindEvents() {
       exclusions: quote?.exclusions || [],
       merchantName: settings.businessName || 'Freelance Professional',
       payoutEmail: settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai',
+      ownerUid: authUser?.uid || null,
       createdAt: payment.createdAt || new Date().toISOString(),
     };
     const encodedInvoice = encodeInvoicePayload(clientPayload);
@@ -600,7 +618,15 @@ function bindEvents() {
     button.textContent = 'Preparing PDF...';
     try {
       const { settings } = getState();
-      await downloadTransactionPdf({ type: 'invoice', payment, quote: quote || {}, settings });
+      const invoiceSettings = canUpdateAccountState()
+        ? settings
+        : {
+            ...settings,
+            businessName: payment.merchantName || 'Freelance Professional',
+            businessEmail: '',
+            paypalPayoutEmail: payment.payoutEmail || '',
+          };
+      await downloadTransactionPdf({ type: 'invoice', payment, quote: quote || {}, settings: invoiceSettings });
       toast.success('Invoice PDF downloaded. Check your Downloads or Files app.');
     } catch (err) {
       console.error('Could not generate invoice PDF:', err);
@@ -643,14 +669,15 @@ function bindEvents() {
       return;
     }
 
-    upsertPayment(updated);
-
-    if (quote) {
-      upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+    if (canUpdateAccountState()) {
+      upsertPayment(updated);
+      if (quote) {
+        upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+      }
     }
 
     const nextHash = currentParams.inv
-      ? `#route/payment/${payment.id}?autoprint=1&inv=${currentParams.inv}`
+      ? `#route/payment/${payment.id}?client=1&autoprint=1&inv=${currentParams.inv}`
       : `#route/payment/${payment.id}?autoprint=1`;
     setTimeout(() => {
       location.hash = nextHash;
@@ -666,7 +693,7 @@ function applyPaymentUpdate(updates) {
 
   const wasPaid = payment.status === 'captured_simulation' || payment.status === 'captured';
   payment = nextPayment;
-  upsertPayment(payment);
+  if (canUpdateAccountState()) upsertPayment(payment);
 
   const isPaid = payment.status === 'captured_simulation' || payment.status === 'captured';
   if (isPaid && !wasPaid) {
@@ -741,10 +768,12 @@ export async function mount(container, params = {}) {
       capturedAt: invoice.capturedAt,
     });
   });
-  unsubscribeStore = subscribe('payments', state => {
-    const updatedPayment = state.payments.find(item => item.id === payment.id);
-    if (updatedPayment) applyPaymentUpdate(updatedPayment);
-  });
+  if (isFreelancerPreview()) {
+    unsubscribeStore = subscribe('payments', state => {
+      const updatedPayment = state.payments.find(item => item.id === payment.id);
+      if (updatedPayment) applyPaymentUpdate(updatedPayment);
+    });
+  }
 }
 
 export function unmount() {
@@ -758,6 +787,7 @@ export function unmount() {
   unsubscribeStore?.();
   unsubscribeInvoice = null;
   unsubscribeStore = null;
+  invoiceOwnerUid = null;
 
   if (rootElem?.parentNode) {
     rootElem.parentNode.removeChild(rootElem);

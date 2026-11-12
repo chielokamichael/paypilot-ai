@@ -16,8 +16,89 @@ import { toast } from '../components/toast.js';
 let rootElem = null;
 let payment = null;
 let quote = null;
+let currentParams = {};
+
+function isFreelancerPreview() {
+  const { authUser } = getState();
+  return Boolean(authUser) && currentParams.client !== '1' && !currentParams.inv;
+}
+
+function getReceiptSettings() {
+  const { settings } = getState();
+  if (isFreelancerPreview()) return settings;
+  return {
+    ...settings,
+    businessName: payment.merchantName || 'Freelance Professional',
+    businessEmail: '',
+    paypalPayoutEmail: payment.payoutEmail || '',
+  };
+}
 
 async function loadPayment(id, params = {}) {
+  const isClientLink = params.client === '1' || Boolean(params.inv);
+
+  if (isClientLink) {
+    try {
+      const remote = await fetchPublicInvoice(id);
+      if (remote) {
+        payment = {
+          id,
+          quoteId: remote.quoteId || 'INV-001',
+          amount: Number(remote.amount) || 0,
+          currency: remote.currency || 'USD',
+          status: remote.status || 'captured_simulation',
+          transactionId: remote.transactionId || 'TXN-PAYPAL-' + id,
+          payerEmail: remote.payerEmail || remote.clientEmail || '',
+          capturedAt: remote.capturedAt || new Date().toISOString(),
+          sdkVersion: 'v6',
+          merchantName: remote.merchantName,
+          payoutEmail: remote.payoutEmail,
+        };
+        quote = {
+          id: remote.quoteId || 'INV-001',
+          clientName: remote.clientName,
+          clientEmail: remote.clientEmail,
+          projectTitle: remote.projectTitle,
+          lineItems: remote.lineItems || [],
+          milestones: remote.milestones || [],
+        };
+        return true;
+      }
+    } catch (err) {
+      console.warn('Firestore fetchPublicInvoice error on client receipt:', err);
+    }
+
+    if (params.inv) {
+      const decoded = decodeInvoicePayload(params.inv);
+      if (decoded) {
+        payment = {
+          id,
+          quoteId: decoded.quoteId || 'INV-001',
+          amount: Number(decoded.amount) || 0,
+          currency: decoded.currency || 'USD',
+          status: decoded.status || 'captured_simulation',
+          transactionId: decoded.transactionId || 'TXN-PAYPAL-' + id,
+          payerEmail: decoded.payerEmail || decoded.clientEmail || '',
+          capturedAt: decoded.capturedAt || new Date().toISOString(),
+          sdkVersion: 'v6',
+          merchantName: decoded.merchantName,
+          payoutEmail: decoded.payoutEmail,
+        };
+        quote = {
+          id: decoded.quoteId || 'INV-001',
+          clientName: decoded.clientName,
+          clientEmail: decoded.clientEmail,
+          projectTitle: decoded.projectTitle,
+          lineItems: decoded.lineItems || [],
+          milestones: decoded.milestones || [],
+        };
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // 1. Try local store
   payment = getPaymentById(id);
   if (payment) {
@@ -97,12 +178,13 @@ function render() {
   container.className = 'client-portal-wrap';
 
   const { amount, currency, status, transactionId, capturedAt, payerEmail, sdkVersion } = payment;
-  const { authUser, settings } = getState();
+  const freelancerPreview = isFreelancerPreview();
+  const { settings } = getState();
   const badgeClass = paymentStatusBadge(status);
   const badgeLabel = paymentStatusLabel(status);
 
-  const merchantName = payment.merchantName || settings.businessName || 'Freelance Professional';
-  const payoutEmail = payment.payoutEmail || settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai';
+  const merchantName = payment.merchantName || (freelancerPreview ? settings.businessName : '') || 'Freelance Professional';
+  const payoutEmail = payment.payoutEmail || (freelancerPreview ? settings.paypalPayoutEmail || settings.businessEmail : '') || 'merchant@paypilot.ai';
 
   // Render itemized deliverables in receipt
   const lineRows = (quote?.lineItems || []).map(li => `
@@ -118,7 +200,7 @@ function render() {
   `).join('');
 
   container.innerHTML = `
-    ${authUser ? `
+    ${freelancerPreview ? `
       <!-- Freelancer Preview Alert Bar -->
       <div style="background: linear-gradient(90deg, #063821 0%, #0B4A2E 100%); color: #E8F8F0; padding: 10px 24px; border-bottom: 1px solid rgba(8, 118, 71, 0.4); display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--text-xs); flex-wrap: wrap;" data-print-hide>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -250,7 +332,7 @@ function render() {
           Download Receipt PDF
         </button>
 
-        ${authUser ? `
+        ${freelancerPreview ? `
           <a href="#route/overview" class="btn btn-ghost btn-sm" style="font-size: var(--text-xs);">
             &larr; Exit Preview
           </a>
@@ -273,8 +355,7 @@ function bindEvents() {
     button.disabled = true;
     button.textContent = 'Preparing PDF...';
     try {
-      const { settings } = getState();
-      await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings });
+      await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings: getReceiptSettings() });
       toast.success('Receipt PDF downloaded. Check your Downloads or Files app.');
     } catch (err) {
       console.error('Could not generate receipt PDF:', err);
@@ -289,6 +370,7 @@ function bindEvents() {
 }
 
 export async function mount(container, params = {}) {
+  currentParams = params;
   if (!params.id) {
     location.hash = '#route/overview';
     return;
@@ -321,8 +403,7 @@ export async function mount(container, params = {}) {
   if (params.autoprint === '1') {
     setTimeout(async () => {
       try {
-        const { settings } = getState();
-        await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings });
+        await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings: getReceiptSettings() });
       } catch (err) {
         console.error('Could not automatically generate receipt PDF:', err);
         toast.error('Could not create the receipt PDF. Use the Download Receipt PDF button.');

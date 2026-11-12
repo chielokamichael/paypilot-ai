@@ -197,7 +197,7 @@ function bindEvents() {
   });
 
   document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
-    const { settings } = getState();
+    const { settings, authUser } = getState();
     const currency = settings.currency || 'USD';
     const amount = currentQuote.lineItems.reduce((s, li) => s + (li.quantity * li.rate), 0);
     const merchantName = settings.businessName || 'Freelance Professional';
@@ -221,6 +221,7 @@ function bindEvents() {
       exclusions: currentQuote.exclusions || [],
       merchantName,
       payoutEmail,
+      ownerUid: authUser?.uid || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -243,7 +244,7 @@ function bindEvents() {
     upsertPayment(payment);
 
     const encoded = encodeInvoicePayload(invoicePayload);
-    const clientUrl = `${window.location.origin}${window.location.pathname}#route/checkout/${orderId}?inv=${encoded}`;
+    const clientUrl = `${window.location.origin}${window.location.pathname}#route/checkout/${orderId}?client=1&inv=${encoded}`;
     try {
       await navigator.clipboard.writeText(clientUrl);
       toast.success('Universal client checkout link copied to clipboard!');

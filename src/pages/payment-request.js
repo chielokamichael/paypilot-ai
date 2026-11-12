@@ -10,12 +10,13 @@ import { getQuoteById, getState, upsertPayment, upsertQuote, subscribe } from '.
 import { formatCurrency, CURRENCIES } from '../utils/format.js';
 import { createV6Order as createOrder } from '../services/paypal.v6.js';
 import { toast } from '../components/toast.js';
-import { savePublicInvoice, encodeInvoicePayload } from '../services/firebaseSync.js';
+import { savePublicInvoice, encodeInvoicePayload, subscribeToPublicInvoice } from '../services/firebaseSync.js';
 
 let rootElem = null;
 let quote = null;
 let generatedOrderId = null;
 let unsubscribePayments = null;
+let unsubscribeInvoice = null;
 let lastObservedPaymentStatus = null;
 
 function refreshGeneratedPaymentStatus() {
@@ -231,7 +232,7 @@ function bindEvents() {
     generatedOrderId = orderId;
     lastObservedPaymentStatus = null;
 
-    const { settings } = getState();
+    const { settings, authUser } = getState();
     const merchantName = settings.businessName || 'Freelance Professional';
     const payoutEmail = settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai';
 
@@ -250,6 +251,7 @@ function bindEvents() {
       exclusions: quote.exclusions || [],
       merchantName,
       payoutEmail,
+      ownerUid: authUser?.uid || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -273,13 +275,34 @@ function bindEvents() {
       createdAt: new Date().toISOString(),
     };
     upsertPayment(payment);
+    unsubscribeInvoice?.();
+    unsubscribeInvoice = subscribeToPublicInvoice(orderId, invoice => {
+      if (invoice.ownerUid !== getState().authUser?.uid) return;
+      const currentPayment = getState().payments.find(item => item.id === orderId);
+      if (!currentPayment || !invoice.status) return;
+
+      upsertPayment({
+        ...currentPayment,
+        status: invoice.status,
+        transactionId: invoice.transactionId,
+        payerEmail: invoice.payerEmail,
+        capturedAt: invoice.capturedAt,
+      });
+
+      if (invoice.status === 'captured_simulation' || invoice.status === 'captured') {
+        const currentQuote = getQuoteById(quote.id);
+        if (currentQuote && currentQuote.status !== 'paid') {
+          upsertQuote({ ...currentQuote, status: 'paid', updatedAt: invoice.capturedAt || new Date().toISOString() });
+        }
+      }
+    });
 
     // Update quote status to sent/approved
     upsertQuote({ ...quote, status: 'approved', updatedAt: new Date().toISOString() });
 
     // Generate universal cross-browser link with fallback payload
     const encoded = encodeInvoicePayload(invoicePayload);
-    const clientUrl = `${window.location.origin}${window.location.pathname}#route/checkout/${orderId}?inv=${encoded}`;
+    const clientUrl = `${window.location.origin}${window.location.pathname}#route/checkout/${orderId}?client=1&inv=${encoded}`;
     if (urlInput) urlInput.value = clientUrl;
 
     // Configure email link
@@ -312,9 +335,8 @@ function bindEvents() {
   });
 
   previewBtn?.addEventListener('click', () => {
-    if (generatedOrderId) {
-      location.hash = `#route/checkout/${generatedOrderId}`;
-    }
+    const clientHash = urlInput?.value.split('#')[1];
+    if (generatedOrderId && clientHash) location.hash = clientHash;
   });
 }
 
@@ -335,7 +357,9 @@ export function unmount() {
     rootElem.parentNode.removeChild(rootElem);
   }
   unsubscribePayments?.();
+  unsubscribeInvoice?.();
   unsubscribePayments = null;
+  unsubscribeInvoice = null;
   rootElem = null;
   generatedOrderId = null;
   lastObservedPaymentStatus = null;
