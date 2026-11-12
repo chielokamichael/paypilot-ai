@@ -6,11 +6,9 @@
  * milestones, deliverable line items, and payment actions.
  */
 
-import { getState, upsertQuote, upsertPayment, subscribe } from '../state/store.js';
+import { getState, subscribe } from '../state/store.js';
 import { formatCurrency, quoteStatusBadge, quoteStatusLabel } from '../utils/format.js';
 import { toast } from '../components/toast.js';
-import { createV6Order } from '../services/paypal.v6.js';
-import { savePublicInvoice, encodeInvoicePayload } from '../services/firebaseSync.js';
 import { downloadTransactionPdf } from '../services/pdfExport.js';
 
 let rootElem = null;
@@ -82,10 +80,6 @@ function render() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
           Download PDF
         </button>
-        ${status !== 'paid' ? `<button id="btn-copy-link" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          Copy Client Checkout Link
-        </button>` : ''}
       </div>
     </div>
 
@@ -163,11 +157,8 @@ function render() {
         </div>
 
         ${status !== 'paid' ? `<div class="actions quote-detail-actions" data-print-hide>
-          <button id="btn-approve" class="btn btn-secondary btn-sm" ${status === 'approved' ? 'disabled' : ''}>
-            ${status === 'approved' ? '✓ Quote Approved' : 'Approve Quote'}
-          </button>
           <button id="btn-pay" class="btn btn-primary btn-sm">
-            Request Payment from ${clientName} &rarr;
+            ${status === 'payment_link_created' ? 'Create another payment link' : 'Create payment link'} for ${clientName} &rarr;
           </button>
         </div>` : '<p class="badge badge-success" style="margin-top: var(--space-6);">Demo checkout complete · no funds transferred</p>'}
 
@@ -193,75 +184,6 @@ function bindEvents() {
     } finally {
       button.innerHTML = label;
       button.disabled = false;
-    }
-  });
-
-  document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
-    const { settings, authUser } = getState();
-    const currency = settings.currency || 'USD';
-    const amount = currentQuote.lineItems.reduce((s, li) => s + (li.quantity * li.rate), 0);
-    const merchantName = settings.businessName || 'Freelance Professional';
-    const payoutEmail = settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai';
-
-    // Create PayPal order placeholder if not already created
-    const { orderId } = await createV6Order({ amount, currency, quoteId: currentQuote.id });
-
-    const invoicePayload = {
-      orderId,
-      quoteId: currentQuote.id,
-      amount,
-      currency,
-      status: 'awaiting_approval',
-      clientName: currentQuote.clientName,
-      clientEmail: currentQuote.clientEmail,
-      projectTitle: currentQuote.projectTitle,
-      lineItems: currentQuote.lineItems || [],
-      milestones: currentQuote.milestones || [],
-      assumptions: currentQuote.assumptions || [],
-      exclusions: currentQuote.exclusions || [],
-      merchantName,
-      payoutEmail,
-      ownerUid: authUser?.uid || null,
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      await savePublicInvoice(orderId, invoicePayload);
-    } catch {
-      toast.error('Could not save the invoice to Firestore. Check the Firebase rules and try again.');
-      return;
-    }
-
-    const payment = {
-      id: orderId,
-      quoteId: currentQuote.id,
-      amount,
-      currency,
-      status: 'awaiting_approval',
-      payerEmail: '',
-      createdAt: new Date().toISOString(),
-    };
-    upsertPayment(payment);
-
-    const encoded = encodeInvoicePayload(invoicePayload);
-    const clientUrl = `${window.location.origin}${window.location.pathname}#route/checkout/${orderId}?client=1&inv=${encoded}`;
-    try {
-      await navigator.clipboard.writeText(clientUrl);
-      toast.success('Universal client checkout link copied to clipboard!');
-    } catch {
-      prompt('Copy this client payment link:', clientUrl);
-    }
-  });
-
-  document.getElementById('btn-approve')?.addEventListener('click', () => {
-    currentQuote.status = 'approved';
-    currentQuote.updatedAt = new Date().toISOString();
-    upsertQuote(currentQuote);
-    toast.success('Quote approved.');
-    const approveBtn = document.getElementById('btn-approve');
-    if (approveBtn) {
-      approveBtn.disabled = true;
-      approveBtn.textContent = '✓ Quote Approved';
     }
   });
 

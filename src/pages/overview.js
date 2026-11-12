@@ -29,7 +29,7 @@ function render() {
   const activity = [
     ...payments.map(payment => ({
       kind: 'payment',
-      title: `${paymentStatusLabel(payment.status)} payment`,
+      title: paymentStatusLabel(payment.status),
       detail: `Quote #${payment.quoteId}`,
       amount: payment.amount,
       date: payment.capturedAt || payment.createdAt,
@@ -84,15 +84,15 @@ function render() {
         </a>
         <a class="overview-stat" href="#quotes">
           <span class="overview-stat__icon overview-stat__icon--gold" aria-hidden="true">${ICONS.approved}</span>
-          <span class="overview-stat__label">Approved</span>
+          <span class="overview-stat__label">Ready for payment link</span>
           <strong>${quotes.filter(quote => quote.status === 'approved').length}</strong>
-          <small>Ready to collect</small>
+          <small>Reviewed quotes; create a link when ready</small>
         </a>
         <a class="overview-stat" href="#payments">
           <span class="overview-stat__icon overview-stat__icon--blue" aria-hidden="true">${ICONS.pending}</span>
-          <span class="overview-stat__label">Pending</span>
+          <span class="overview-stat__label">Awaiting client checkout</span>
           <strong>${formatCurrency(pending, currency)}</strong>
-          <small>${pendingPayments.length} open request${pendingPayments.length === 1 ? '' : 's'}</small>
+          <small>${pendingPayments.length} open sandbox checkout${pendingPayments.length === 1 ? '' : 's'}</small>
         </a>
         <a class="overview-stat" href="#payments">
           <span class="overview-stat__icon overview-stat__icon--coral" aria-hidden="true">${ICONS.payment}</span>

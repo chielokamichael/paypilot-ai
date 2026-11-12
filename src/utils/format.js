@@ -104,6 +104,7 @@ export function quoteStatusBadge(status) {
   const map = {
     draft:    'badge-draft',
     approved: 'badge-approved',
+    payment_link_created: 'badge-accent',
     sent:     'badge-accent',
     expired:  'badge-danger',
   };
@@ -116,7 +117,7 @@ export function quoteStatusBadge(status) {
 export function paymentStatusBadge(status) {
   const map = {
     awaiting_approval:    'badge-warning',
-    approved:             'badge-accent',
+    approved:             'badge-warning',
     captured_simulation:  'badge-approved',
     cancelled:            'badge-draft',
     failed:               'badge-danger',
@@ -129,8 +130,8 @@ export function paymentStatusBadge(status) {
  */
 export function paymentStatusLabel(status) {
   const map = {
-    awaiting_approval:   'Awaiting Client Payment',
-    approved:            'Ready for Payment',
+    awaiting_approval:   'Awaiting client checkout',
+    approved:            'Awaiting client checkout',
     captured_simulation: 'Checkout Simulated',
     cancelled:           'Cancelled',
     failed:              'Failed',
@@ -144,7 +145,8 @@ export function paymentStatusLabel(status) {
 export function quoteStatusLabel(status) {
   const map = {
     draft:    'Draft',
-    approved: 'Awaiting Client Payment',
+    approved: 'Ready for payment link',
+    payment_link_created: 'Payment link created',
     sent:     'Sent to Client',
     paid:     'Paid (simulation)',
     expired:  'Expired',

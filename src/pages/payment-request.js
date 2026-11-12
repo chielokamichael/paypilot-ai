@@ -86,8 +86,8 @@ function render() {
     <header class="page-header" style="margin-bottom: var(--space-6);">
       <div>
         <p class="dashboard-kicker">INVOICE &amp; PAYMENT COLLECTION</p>
-        <h1 class="page-header__title">Request Payment from Client</h1>
-        <p class="page-header__sub">Create a client link for the sandbox checkout for Quote #${quote.id}. This demo does not process a real payment.</p>
+        <h1 class="page-header__title">Create a payment link</h1>
+        <p class="page-header__sub">Create a shareable sandbox checkout link for Quote #${quote.id}. No real payment is processed and no funds are transferred.</p>
       </div>
     </header>
 
@@ -146,7 +146,7 @@ function render() {
         
         <h3 style="font-size: var(--text-base); font-weight: var(--weight-bold); margin-bottom: var(--space-2); color: var(--color-ink);">Generate Payment Link</h3>
         <p style="font-size: var(--text-xs); color: var(--color-ink-2); margin-bottom: var(--space-5); line-height: 1.5;">
-          This generates a PayPal JavaScript SDK v6 checkout link configured with your payout details. You can send this link directly to <strong>${clientName}</strong>.
+          Generate a sandbox checkout link to share with <strong>${clientName}</strong>. Checkout is simulated; your payout details are display-only.
         </p>
 
         <div class="field-group" style="margin-bottom: var(--space-5);">
@@ -167,7 +167,7 @@ function render() {
           </div>
 
           <p style="font-size: var(--text-xs); color: var(--color-ink-2); margin-bottom: var(--space-3);">
-            Share this link with <strong>${clientName}</strong> so they can approve and pay with PayPal:
+            Share this link with <strong>${clientName}</strong> so they can review the invoice and try the sandbox checkout:
           </p>
 
           <div class="payment-link-copy">
@@ -297,8 +297,7 @@ function bindEvents() {
       }
     });
 
-    // Update quote status to sent/approved
-    upsertQuote({ ...quote, status: 'approved', updatedAt: new Date().toISOString() });
+    upsertQuote({ ...quote, status: 'payment_link_created', updatedAt: new Date().toISOString() });
 
     // Generate universal cross-browser link with fallback payload
     const encoded = encodeInvoicePayload(invoicePayload);
