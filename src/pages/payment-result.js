@@ -10,6 +10,8 @@
 import { getPaymentById, getQuoteById, getState, upsertPayment, upsertQuote } from '../state/store.js';
 import { formatCurrency, paymentStatusBadge, paymentStatusLabel } from '../utils/format.js';
 import { fetchPublicInvoice, decodeInvoicePayload } from '../services/firebaseSync.js';
+import { downloadTransactionPdf } from '../services/pdfExport.js';
+import { toast } from '../components/toast.js';
 
 let rootElem = null;
 let payment = null;
@@ -145,8 +147,8 @@ function render() {
 
       <div class="client-portal-actions">
         <button id="btn-print-receipt" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print Receipt (PDF)
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+          Download Receipt PDF
         </button>
       </div>
     </header>
@@ -187,7 +189,7 @@ function render() {
         <div style="padding: var(--space-6);">
           
           <!-- Summary Parties Grid -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); margin-bottom: var(--space-5); font-size: var(--text-xs);">
+          <div class="receipt-parties">
             <div style="background: var(--color-surface-alt); padding: var(--space-4); border-radius: var(--radius-md);">
               <span style="color: var(--color-ink-3); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 3px;">Client</span>
               <strong style="color: var(--color-ink); font-size: var(--text-sm); display: block;">${quote?.clientName || 'Valued Client'}</strong>
@@ -244,8 +246,8 @@ function render() {
       <!-- Client Safe Actions (NO ADMIN WORKSPACE BUTTONS FOR CLIENTS!) -->
       <div style="display: flex; justify-content: center; gap: var(--space-3); margin-top: var(--space-6);" data-print-hide>
         <button id="btn-print-bottom" class="btn btn-primary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print / Save PDF Receipt
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+          Download Receipt PDF
         </button>
 
         ${authUser ? `
@@ -265,8 +267,25 @@ function render() {
 }
 
 function bindEvents() {
-  document.getElementById('btn-print-receipt')?.addEventListener('click', () => window.print());
-  document.getElementById('btn-print-bottom')?.addEventListener('click', () => window.print());
+  const downloadReceipt = async event => {
+    const button = event.currentTarget;
+    const label = button.innerHTML;
+    button.disabled = true;
+    button.textContent = 'Preparing PDF...';
+    try {
+      const { settings } = getState();
+      await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings });
+      toast.success('Receipt PDF downloaded. Check your Downloads or Files app.');
+    } catch (err) {
+      console.error('Could not generate receipt PDF:', err);
+      toast.error('Could not create the PDF. Try opening the app in Chrome or Safari.');
+    } finally {
+      button.innerHTML = label;
+      button.disabled = false;
+    }
+  };
+  document.getElementById('btn-print-receipt')?.addEventListener('click', downloadReceipt);
+  document.getElementById('btn-print-bottom')?.addEventListener('click', downloadReceipt);
 }
 
 export async function mount(container, params = {}) {
@@ -298,13 +317,15 @@ export async function mount(container, params = {}) {
   container.replaceChildren(rootElem);
   bindEvents();
 
-  // Automatically trigger PDF / print receipt dialog upon payment completion
+  // Automatically download a PDF when a completed checkout explicitly requests one.
   if (params.autoprint === '1') {
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        window.print();
+        const { settings } = getState();
+        await downloadTransactionPdf({ type: 'receipt', payment, quote: quote || {}, settings });
       } catch (err) {
-        console.warn('Auto-print dialog blocked or cancelled:', err);
+        console.error('Could not automatically generate receipt PDF:', err);
+        toast.error('Could not create the receipt PDF. Use the Download Receipt PDF button.');
       }
     }, 800);
   }

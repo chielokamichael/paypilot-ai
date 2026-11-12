@@ -90,7 +90,7 @@ function render() {
       </div>
     </header>
 
-    <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr); gap: var(--space-6); align-items: start;">
+    <div class="payment-request-layout">
       
       <!-- Left: Invoice Summary -->
       <section class="section" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-6);">
@@ -104,7 +104,7 @@ function render() {
         </div>
 
         <!-- Recipient & Payout Info -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); background: var(--color-surface-alt); padding: var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-5); font-size: var(--text-xs);">
+        <div class="payment-request-parties">
           <div>
             <span style="color: var(--color-ink-3); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Client (Payer)</span>
             <strong style="color: var(--color-ink); font-size: var(--text-sm); display: block;">${clientName}</strong>
@@ -169,7 +169,7 @@ function render() {
             Share this link with <strong>${clientName}</strong> so they can approve and pay with PayPal:
           </p>
 
-          <div style="display: flex; gap: 6px; margin-bottom: var(--space-4);">
+          <div class="payment-link-copy">
             <input id="input-client-url" class="field-input" readonly style="font-size: 11px; font-family: var(--font-mono); background: var(--color-surface-alt);" />
             <button id="btn-copy-url" class="btn btn-secondary btn-sm" type="button" style="flex-shrink: 0;">Copy</button>
           </div>

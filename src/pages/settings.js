@@ -123,7 +123,7 @@ function render() {
           <h2 class="section__title">Business Profile &amp; Invoice Defaults</h2>
         </div>
         <div class="section__content">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+          <div class="settings-grid settings-grid--2">
             <div class="field-group">
               <label class="field-label" for="business-name">Business / Freelancer Name</label>
               <input class="field-input" id="business-name" name="businessName" value="${settings.businessName || ''}" required>
@@ -134,7 +134,7 @@ function render() {
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+          <div class="settings-grid settings-grid--2">
             <div class="field-group">
               <label class="field-label" for="business-phone">Business Phone</label>
               <input class="field-input" id="business-phone" name="businessPhone" type="tel" value="${settings.businessPhone || ''}">
@@ -150,7 +150,7 @@ function render() {
             <input class="field-input" id="business-address" name="businessAddress" value="${settings.businessAddress || ''}">
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4);">
+          <div class="settings-grid settings-grid--3">
             <div class="field-group">
               <label class="field-label" for="hourly-rate">Default Rate (${settings.currency || 'USD'}/hr)</label>
               <input class="field-input" id="hourly-rate" name="defaultHourlyRate" type="number" min="0" step="0.01" value="${settings.defaultHourlyRate ?? 100}">

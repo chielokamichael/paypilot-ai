@@ -11,6 +11,7 @@ import { formatCurrency, quoteStatusBadge, quoteStatusLabel } from '../utils/for
 import { toast } from '../components/toast.js';
 import { createV6Order } from '../services/paypal.v6.js';
 import { savePublicInvoice, encodeInvoicePayload } from '../services/firebaseSync.js';
+import { downloadTransactionPdf } from '../services/pdfExport.js';
 
 let rootElem = null;
 let currentQuote = null;
@@ -78,8 +79,8 @@ function render() {
       </a>
       <div style="display: flex; gap: var(--space-3);">
         <button id="btn-print" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print Quote
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+          Download PDF
         </button>
         ${status !== 'paid' ? `<button id="btn-copy-link" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
@@ -124,7 +125,7 @@ function render() {
 
       <div class="section__content" style="background: var(--color-surface); padding: var(--space-6); border: 1px solid var(--color-border); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); padding: var(--space-4); background: var(--color-surface-alt); border-radius: var(--radius-md); margin-bottom: var(--space-5); font-size: var(--text-xs);">
+        <div class="quote-parties">
           <div>
             <span style="color: var(--color-ink-3); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Client</span>
             <strong style="color: var(--color-ink); font-size: var(--text-sm); display: block;">${clientName}</strong>
@@ -173,7 +174,23 @@ function render() {
 }
 
 function bindEvents() {
-  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+  document.getElementById('btn-print')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    const label = button.innerHTML;
+    button.disabled = true;
+    button.textContent = 'Preparing PDF...';
+    try {
+      const { settings } = getState();
+      await downloadTransactionPdf({ type: 'quote', quote: currentQuote, settings });
+      toast.success('Quote PDF downloaded. Check your Downloads or Files app.');
+    } catch (err) {
+      console.error('Could not generate quote PDF:', err);
+      toast.error('Could not create the PDF. Try opening the app in Chrome or Safari.');
+    } finally {
+      button.innerHTML = label;
+      button.disabled = false;
+    }
+  });
 
   document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
     const { settings } = getState();
