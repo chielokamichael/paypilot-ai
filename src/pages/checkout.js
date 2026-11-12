@@ -22,6 +22,7 @@ import {
 import { formatCurrency, paymentStatusLabel, paymentStatusBadge } from '../utils/format.js';
 import { toast } from '../components/toast.js';
 import { fetchPublicInvoice, updatePublicInvoiceStatus, decodeInvoicePayload, encodeInvoicePayload, subscribeToPublicInvoice } from '../services/firebaseSync.js';
+import { downloadTransactionPdf } from '../services/pdfExport.js';
 
 let rootElem = null;
 let payment = null;
@@ -30,16 +31,31 @@ let sdkInstance = null;
 let currentParams = {};
 let unsubscribeInvoice = null;
 let unsubscribeStore = null;
+let invoiceOwnerUid = null;
 
 function isFreelancerPreview() {
-  return Boolean(getState().authUser) && currentParams.client !== '1';
+  return Boolean(getState().authUser) && currentParams.client !== '1' && !currentParams.inv;
+}
+
+function canUpdateAccountState() {
+  const { authUser, payments, quotes } = getState();
+  if (!authUser) return false;
+  if (invoiceOwnerUid) return invoiceOwnerUid === authUser.uid;
+  if (!isFreelancerPreview()) return false;
+
+  const localPayment = payments.find(item => item.id === payment?.id);
+  return localPayment?.quoteId === payment?.quoteId && quotes.some(item => item.id === payment.quoteId);
 }
 
 async function loadPayment(orderId, params = {}) {
+  invoiceOwnerUid = null;
+  const isClientLink = params.client === '1' || Boolean(params.inv);
+
   // The public invoice is authoritative; link payloads and local storage can be stale.
   try {
     const remote = await fetchPublicInvoice(orderId);
     if (remote) {
+      invoiceOwnerUid = remote.ownerUid || null;
       payment = {
         id: orderId,
         quoteId: remote.quoteId || 'INV-001',
@@ -61,20 +77,24 @@ async function loadPayment(orderId, params = {}) {
         assumptions: remote.assumptions || [],
         exclusions: remote.exclusions || [],
       };
-      upsertPayment(payment);
-      upsertQuote(quote);
+      if (canUpdateAccountState()) {
+        upsertPayment(payment);
+        upsertQuote(quote);
+      }
       return true;
     }
   } catch (err) {
     console.warn('Firestore fetchPublicInvoice error:', err);
   }
 
-  // Fall back to the local store if the public invoice is unavailable.
-  const { payments } = getState();
-  payment = payments.find(p => p.id === orderId);
-  if (payment) {
-    quote = getQuoteById(payment.quoteId);
-    if (quote) return true;
+  // Client links must not fall back to another signed-in user's workspace data.
+  if (!isClientLink) {
+    const { payments } = getState();
+    payment = payments.find(p => p.id === orderId);
+    if (payment) {
+      quote = getQuoteById(payment.quoteId);
+      if (quote) return true;
+    }
   }
 
   // URL payload is the final fallback for a fresh browser without Firestore access.
@@ -102,8 +122,6 @@ async function loadPayment(orderId, params = {}) {
         assumptions: decoded.assumptions || [],
         exclusions: decoded.exclusions || [],
       };
-      upsertPayment(payment);
-      upsertQuote(quote);
       return true;
     }
   }
@@ -117,11 +135,11 @@ function render() {
 
   const { amount, currency, status } = payment;
   const { clientName, clientEmail, projectTitle, lineItems, milestones, exclusions, assumptions } = quote || {};
-  const { settings, authUser } = getState();
+  const { settings } = getState();
   const freelancerPreview = isFreelancerPreview();
 
-  const merchantName = settings.businessName || 'Freelance Professional';
-  const payoutEmail = settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai';
+  const merchantName = payment.merchantName || (freelancerPreview ? settings.businessName : '') || 'Freelance Professional';
+  const payoutEmail = payment.payoutEmail || (freelancerPreview ? settings.paypalPayoutEmail || settings.businessEmail : '') || 'merchant@paypilot.ai';
 
   // Render line items summary rows
   const lineRows = (lineItems || []).map(li => `
@@ -195,8 +213,8 @@ function render() {
 
       <div class="client-portal-actions">
         <button id="btn-print-invoice" class="btn btn-secondary btn-sm" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print / Save PDF
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+          Download PDF
         </button>
 
         ${freelancerPreview ? `
@@ -210,7 +228,7 @@ function render() {
     <!-- Main Client Portal Body -->
     <div class="client-portal-body">
       
-      <div class="checkout-layout" style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr); gap: var(--space-8); align-items: start;">
+      <div class="checkout-layout">
         
         <!-- Left Column: Scope, AI Audit & Invoice Details -->
         <div class="checkout-details">
@@ -263,7 +281,7 @@ function render() {
               </div>
 
               <!-- Parties Details Grid -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); padding: var(--space-4); background: var(--color-surface-alt); border-radius: var(--radius-md); margin-bottom: var(--space-5); font-size: var(--text-xs);">
+              <div class="checkout-parties">
                 <div>
                   <span style="color: var(--color-ink-3); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 3px;">Billed To (Client)</span>
                   <strong style="color: var(--color-ink); font-size: var(--text-sm); display: block;">${clientName || 'Valued Client'}</strong>
@@ -317,7 +335,7 @@ function render() {
         </div>
 
         <!-- Right Column: Client checkout or freelancer preview -->
-        <div class="checkout-actions-panel" style="background: var(--color-surface); padding: var(--space-6); border: 1px solid var(--color-border); border-radius: var(--radius-lg); position: sticky; top: var(--space-6);">
+        <div class="checkout-actions-panel">
           ${freelancerPreview ? `
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2);">
               <h3 style="font-size: var(--text-base); font-weight: var(--weight-bold); margin: 0; color: var(--color-ink);">Client checkout preview</h3>
@@ -413,8 +431,8 @@ function renderAlreadyPaid() {
 
         <div style="display: flex; justify-content: center; gap: var(--space-3);">
           <a href="#route/payment/${payment.id}${currentParams.inv ? '?inv=' + currentParams.inv : ''}" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            View &amp; Print Simulation Receipt
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+            View Simulation Receipt
           </a>
         </div>
       </div>
@@ -477,18 +495,18 @@ async function setupPayPalV6Buttons() {
       return;
     }
 
-    upsertPayment(updatedPayment);
-
-    // Keep the freelancer's quote state consistent with the captured payment.
-    if (quote) {
-      upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+    if (canUpdateAccountState()) {
+      upsertPayment(updatedPayment);
+      if (quote) {
+        upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+      }
     }
 
     if (statusEl) {
       statusEl.textContent = 'Simulated checkout complete. No real payment was processed. Redirecting to receipt...';
     }
     const nextHash = currentParams.inv
-      ? `#route/payment/${payment.id}?autoprint=1&inv=${currentParams.inv}`
+      ? `#route/payment/${payment.id}?client=1&autoprint=1&inv=${currentParams.inv}`
       : `#route/payment/${payment.id}?autoprint=1`;
     setTimeout(() => {
       location.hash = nextHash;
@@ -563,7 +581,7 @@ async function setupPayPalV6Buttons() {
 function bindEvents() {
   // Copy Link for Client (preview banner)
   document.getElementById('btn-copy-preview-link')?.addEventListener('click', async () => {
-    const { settings } = getState();
+    const { settings, authUser } = getState();
     const clientPayload = {
       orderId: payment.id,
       quoteId: payment.quoteId,
@@ -579,6 +597,7 @@ function bindEvents() {
       exclusions: quote?.exclusions || [],
       merchantName: settings.businessName || 'Freelance Professional',
       payoutEmail: settings.paypalPayoutEmail || settings.businessEmail || 'merchant@paypilot.ai',
+      ownerUid: authUser?.uid || null,
       createdAt: payment.createdAt || new Date().toISOString(),
     };
     const encodedInvoice = encodeInvoicePayload(clientPayload);
@@ -591,9 +610,31 @@ function bindEvents() {
     }
   });
 
-  // Print Invoice button
-  document.getElementById('btn-print-invoice')?.addEventListener('click', () => {
-    window.print();
+  // Generate the PDF directly so mobile browsers without print support can save it.
+  document.getElementById('btn-print-invoice')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    const label = button.innerHTML;
+    button.disabled = true;
+    button.textContent = 'Preparing PDF...';
+    try {
+      const { settings } = getState();
+      const invoiceSettings = canUpdateAccountState()
+        ? settings
+        : {
+            ...settings,
+            businessName: payment.merchantName || 'Freelance Professional',
+            businessEmail: '',
+            paypalPayoutEmail: payment.payoutEmail || '',
+          };
+      await downloadTransactionPdf({ type: 'invoice', payment, quote: quote || {}, settings: invoiceSettings });
+      toast.success('Invoice PDF downloaded. Check your Downloads or Files app.');
+    } catch (err) {
+      console.error('Could not generate invoice PDF:', err);
+      toast.error('Could not create the PDF. Try opening the app in Chrome or Safari.');
+    } finally {
+      button.innerHTML = label;
+      button.disabled = false;
+    }
   });
 
   // Card Payment button
@@ -628,14 +669,15 @@ function bindEvents() {
       return;
     }
 
-    upsertPayment(updated);
-
-    if (quote) {
-      upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+    if (canUpdateAccountState()) {
+      upsertPayment(updated);
+      if (quote) {
+        upsertQuote({ ...quote, status: 'paid', updatedAt: result.capturedAt });
+      }
     }
 
     const nextHash = currentParams.inv
-      ? `#route/payment/${payment.id}?autoprint=1&inv=${currentParams.inv}`
+      ? `#route/payment/${payment.id}?client=1&autoprint=1&inv=${currentParams.inv}`
       : `#route/payment/${payment.id}?autoprint=1`;
     setTimeout(() => {
       location.hash = nextHash;
@@ -651,7 +693,7 @@ function applyPaymentUpdate(updates) {
 
   const wasPaid = payment.status === 'captured_simulation' || payment.status === 'captured';
   payment = nextPayment;
-  upsertPayment(payment);
+  if (canUpdateAccountState()) upsertPayment(payment);
 
   const isPaid = payment.status === 'captured_simulation' || payment.status === 'captured';
   if (isPaid && !wasPaid) {
@@ -726,10 +768,12 @@ export async function mount(container, params = {}) {
       capturedAt: invoice.capturedAt,
     });
   });
-  unsubscribeStore = subscribe('payments', state => {
-    const updatedPayment = state.payments.find(item => item.id === payment.id);
-    if (updatedPayment) applyPaymentUpdate(updatedPayment);
-  });
+  if (isFreelancerPreview()) {
+    unsubscribeStore = subscribe('payments', state => {
+      const updatedPayment = state.payments.find(item => item.id === payment.id);
+      if (updatedPayment) applyPaymentUpdate(updatedPayment);
+    });
+  }
 }
 
 export function unmount() {
@@ -743,6 +787,7 @@ export function unmount() {
   unsubscribeStore?.();
   unsubscribeInvoice = null;
   unsubscribeStore = null;
+  invoiceOwnerUid = null;
 
   if (rootElem?.parentNode) {
     rootElem.parentNode.removeChild(rootElem);

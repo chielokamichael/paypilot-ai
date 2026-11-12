@@ -69,7 +69,10 @@ function renderRows() {
         <td class="num">${formatCurrency(totalFor(quote), currency)}</td>
         <td class="quotes-row-actions">
           <a class="btn btn-secondary btn-sm" href="#route/quote/${quote.id}">Open</a>
-          <button class="btn btn-danger btn-sm" type="button" data-delete-quote="${quote.id}" ${hasPayments ? 'disabled title="This quote has payment history and is protected."' : ''} aria-label="Delete quote ${quote.id}">Delete</button>
+          <span class="quotes-delete-action">
+            <button class="btn btn-danger btn-sm" type="button" data-delete-quote="${quote.id}" ${hasPayments ? 'disabled title="Payment history is retained; this quote cannot be deleted."' : ''} aria-label="${hasPayments ? `Delete quote ${quote.id} unavailable: payment history is retained` : `Delete quote ${quote.id}`}" ${hasPayments ? `aria-describedby="quote-delete-protected-${quote.id}"` : ''}>Delete</button>
+            ${hasPayments ? `<small id="quote-delete-protected-${quote.id}" class="quotes-delete-note">Protected: payment history</small>` : ''}
+          </span>
         </td>
       </tr>`;
   }).join('');
@@ -87,10 +90,11 @@ function render() {
           <label class="field"><span class="field__label">Status</span><select id="quotes-status" class="select">
             <option value="all" ${statusValue === 'all' ? 'selected' : ''}>All statuses</option>
             <option value="draft" ${statusValue === 'draft' ? 'selected' : ''}>Draft</option>
-            <option value="approved" ${statusValue === 'approved' ? 'selected' : ''}>Awaiting payment</option>
-            <option value="sent" ${statusValue === 'sent' ? 'selected' : ''}>Sent</option>
-            <option value="paid" ${statusValue === 'paid' ? 'selected' : ''}>Paid</option>
-            <option value="expired" ${statusValue === 'expired' ? 'selected' : ''}>Expired</option>
+            <option value="approved" ${statusValue === 'approved' ? 'selected' : ''}>${quoteStatusLabel('approved')}</option>
+            <option value="payment_link_created" ${statusValue === 'payment_link_created' ? 'selected' : ''}>${quoteStatusLabel('payment_link_created')}</option>
+            <option value="sent" ${statusValue === 'sent' ? 'selected' : ''}>${quoteStatusLabel('sent')}</option>
+            <option value="paid" ${statusValue === 'paid' ? 'selected' : ''}>${quoteStatusLabel('paid')}</option>
+            <option value="expired" ${statusValue === 'expired' ? 'selected' : ''}>${quoteStatusLabel('expired')}</option>
           </select></label>
           <label class="field"><span class="field__label">Sort by</span><select id="quotes-sort" class="select">
             <option value="newest" ${sortValue === 'newest' ? 'selected' : ''}>Recently updated</option>

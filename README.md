@@ -150,6 +150,8 @@ To test end-to-end payment flows without spending real funds:
 5. Open the quote, choose **Request Payment**, then generate a sandbox checkout link.
 6. Keep the freelancer page open in Chrome, open the link in Edge, and run the checkout simulation.
 7. The simulated status should sync to the freelancer dashboard through Firestore and produce a clearly labeled demo receipt. No real payment is processed.
+8. Use **Download PDF** on the quote, invoice, or receipt to save a PDF directly, including in mobile browsers that do not support the print dialog.
+9. Client checkout and payment-link screens adapt to narrow mobile viewports; checkout actions remain visible above the invoice details.
 
 ---
 
