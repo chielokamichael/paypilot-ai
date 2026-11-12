@@ -73,7 +73,7 @@ function render() {
 
   container.innerHTML = `
     <!-- Top backlink and status -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-5);" data-print-hide>
+    <div class="quote-detail-toolbar" data-print-hide>
       <a href="#route/quotes" class="btn btn-ghost btn-sm" style="display: inline-flex; align-items: center; gap: 6px; padding-left: 0;">
         &larr; All Quotes
       </a>
@@ -150,15 +150,19 @@ function render() {
             </thead>
             <tbody>
               ${lineRows}
-              <tr class="summary-row" style="border-top: 2px solid var(--color-border-strong);">
-                <td colspan="3" class="num"><strong style="font-size: var(--text-base);">Total Balance Due</strong></td>
-                <td class="num"><strong style="font-family: var(--font-mono); font-size: var(--text-lg); color: var(--color-accent);">${formatCurrency(subtotal, currency)}</strong></td>
+              <tr class="summary-row quote-table__summary" style="border-top: 2px solid var(--color-border-strong);">
+                <td colspan="4">
+                  <div class="quote-total-summary">
+                    <strong style="font-size: var(--text-base);">Total Balance Due</strong>
+                    <strong class="num" style="font-family: var(--font-mono); font-size: var(--text-lg); color: var(--color-accent);">${formatCurrency(subtotal, currency)}</strong>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        ${status !== 'paid' ? `<div class="actions" style="margin-top: var(--space-6); display: flex; gap: var(--space-3);" data-print-hide>
+        ${status !== 'paid' ? `<div class="actions quote-detail-actions" data-print-hide>
           <button id="btn-approve" class="btn btn-secondary btn-sm" ${status === 'approved' ? 'disabled' : ''}>
             ${status === 'approved' ? '✓ Quote Approved' : 'Approve Quote'}
           </button>

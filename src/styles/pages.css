@@ -786,6 +786,98 @@
   .checkout-layout .section__header .badge { max-width: 100%; white-space: normal; text-align: right; }
 }
 
+.quote-detail-page {
+  min-width: 0;
+  width: 100%;
+}
+
+.quote-detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.quote-detail-toolbar > div {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.quote-total-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.quote-detail-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+@media (max-width: 700px) {
+  .quote-detail-page,
+  .quote-detail-page .section,
+  .quote-detail-page .section__content,
+  .quote-detail-page .table-scroll {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .quote-detail-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quote-detail-toolbar > div {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .quote-detail-page .section__content {
+    padding: var(--space-3) !important;
+  }
+
+  .quote-detail-page .quote-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .quote-detail-page .quote-table th,
+  .quote-detail-page .quote-table td {
+    padding: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+
+  .quote-detail-page .quote-table th:nth-child(2),
+  .quote-detail-page .quote-table td:nth-child(2),
+  .quote-detail-page .quote-table th:nth-child(3),
+  .quote-detail-page .quote-table td:nth-child(3) {
+    display: none;
+  }
+
+  .quote-detail-page .quote-table th:first-child { width: 68%; }
+  .quote-detail-page .quote-table th:last-child { width: 32%; }
+  .quote-detail-page .quote-table td:first-child { overflow-wrap: anywhere; }
+  .quote-detail-page .quote-table .num { white-space: normal; }
+  .quote-detail-page .quote-total-summary { align-items: flex-start; }
+
+  .quote-detail-actions {
+    flex-direction: column;
+  }
+
+  .quote-detail-actions > .btn {
+    width: 100%;
+    min-height: 44px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
 /* ─── PRINT OPTIMIZATIONS ──────────────────────────────────── */
 
 @media print {

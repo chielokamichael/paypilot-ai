@@ -283,9 +283,11 @@ textarea.field-input { min-height: 112px; resize: vertical; }
   .form-row,
   .form-row--2,
   .form-row--3 { grid-template-columns: minmax(0, 1fr); }
-  .line-item { grid-template-columns: minmax(0, 1fr) 64px 78px 40px; gap: 6px; }
+  .line-item { grid-template-columns: repeat(2, minmax(0, 1fr)) 44px; gap: var(--space-2); }
+  .line-item .field-input:first-child { grid-column: 1 / -1; }
   .line-item .field-input { padding-inline: 8px; font-size: var(--text-xs); }
-  .line-item .btn { width: 40px; height: 44px; }
+  .line-item .btn { width: 44px; height: 44px; }
+  .create-quote-page #btn-generate { width: 100%; min-height: 44px; }
 }
 
 /* Form grid helpers */
